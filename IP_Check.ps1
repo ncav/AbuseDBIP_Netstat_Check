@@ -12,29 +12,33 @@ foreach ($line in $netstat) {
         $foreignAddress = $matches[3]
         $foreignPort = $matches[4]
         
-        # Build the URL for the AbuseIPDB API
-        $url = "https://api.abuseipdb.com/api/v2/check?ipAddress=$foreignAddress&maxAgeInDays=90"
+        # Check if the foreign address is a public IP
+        $ipObject = [System.Net.IPAddress]::Parse($foreignAddress)
+        if ($ipObject.AddressFamily -eq "InterNetwork" -and !$ipObject.IsPrivate) {
+            # Build the URL for the AbuseIPDB API
+            $url = "https://api.abuseipdb.com/api/v2/check?ipAddress=$foreignAddress&maxAgeInDays=90"
 
-        # Create a new HTTP request with the API key in the headers
-        $request = Invoke-WebRequest -Uri $url -Headers @{Key = $apiKey}
+            # Create a new HTTP request with the API key in the headers
+            $request = Invoke-WebRequest -Uri $url -Headers @{Key = $apiKey}
 
-        # Convert the JSON response to a PowerShell object
-        $response = ConvertFrom-Json $request.Content
+            # Convert the JSON response to a PowerShell object
+            $response = ConvertFrom-Json $request.Content
 
-        # Check if the address is listed in the API response
-        if ($response.data.abuseConfidenceScore -gt 0) {
-            # Extract the domain name and country code from the API response
-            $domain = $response.data.domain
-            $countryCode = $response.data.countryCode
-            
-            # Use the country code to get the country name from the API
-            $countryUrl = "https://restcountries.com/v2/alpha/$countryCode"
-            $countryRequest = Invoke-WebRequest -Uri $countryUrl
-            $countryResponse = ConvertFrom-Json $countryRequest.Content
-            $country = $countryResponse.name
+            # Check if the address is listed in the API response
+            if ($response.data.abuseConfidenceScore -gt 0) {
+                # Extract the domain name and country code from the API response
+                $domain = $response.data.domain
+                $countryCode = $response.data.countryCode
+                
+                # Use the country code to get the country name from the API
+                $countryUrl = "https://restcountries.com/v2/alpha/$countryCode"
+                $countryRequest = Invoke-WebRequest -Uri $countryUrl
+                $countryResponse = ConvertFrom-Json $countryRequest.Content
+                $country = $countryResponse.name
 
-            # Print a warning message to the user
-            Write-Host "Warning: $foreignAddress ($domain, $country) is listed on the AbuseIPDB with a score of $($response.data.abuseConfidenceScore)"
+                # Print a warning message to the user
+                Write-Host "Warning: $foreignAddress ($domain, $country) is listed on the AbuseIPDB with a score of $($response.data.abuseConfidenceScore)"
+            }
         }
     }
 }
